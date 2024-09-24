@@ -47,9 +47,10 @@ class VotingApp(QWidget):
         self.labelbox = QVBoxLayout()
         self.layout.addLayout(self.labelbox)
 
-        self.choices = []
-        self.vote_counts = {}
-        self.stickers = {}
+        self.choices = [] # 선택지 리스트 초기화
+        
+        self.vote_counts = {} # 투표 결과 초기화
+        self.stickers = {} # 스티커 초기화
 
     def add_choice(self):
         text, ok = QInputDialog.getText(self, '선택지 추가', '선택지 이름을 입력하세요:')
@@ -68,14 +69,14 @@ class VotingApp(QWidget):
 
     def reset_app(self):
         # 주제와 선택지를 초기화하고 처음부터 다시 시작
-        self.topic_input = ''
-        self.choices = []
-        self.vote_counts = {}
-        self.stickers = {}
+        self.topic_input = '' # 주제 초기화
+        self.choices = [] # 선택지 리스트 초기화
+        self.vote_counts = {} # 투표 결과 초기화
+        self.stickers = {} # 스티커 초기화
 
         # 레이아웃에서 기존 위젯들을 모두 제거
         for i in reversed(range(self.labelbox.count())):
-            self.labelbox.itemAt(i).widget().setParent(None)
+            self.labelbox.itemAt(i).widget().setParent(None) # 레이블 박스에 있는 모든 위젯 제거
 
         # 주제 입력 다이얼로그를 다시 띄움
         self.topic_input, ok = QInputDialog.getText(self, '투표 주제 입력', '주제를 입력하세요:')
