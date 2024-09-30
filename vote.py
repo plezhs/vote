@@ -1,8 +1,10 @@
 import sys
 import json
 import random
+import os
+import csv
 from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QLabel, QInputDialog
-from PyQt6.QtGui import QPainter, QColor, QBrush
+from PyQt6.QtGui import QPainter, QColor, QBrush, QPixmap
 from PyQt6.QtCore import Qt, QRect
 from datetime import datetime
 import qt_material
@@ -20,19 +22,10 @@ class VotingApp(QWidget):
         # qt_material의 다크 퍼플 테마 적용
         qt_material.apply_stylesheet(self, theme='dark_purple.xml')
 
-        # 주제를 입력할 수 있는 QInputDialog 생성
-        self.topic_label = QLabel("투표 주제를 입력하세요:")
-        self.layout.addWidget(self.topic_label)
-        self.topic_input, ok = QInputDialog.getText(self, '투표 주제 입력', '주제를 입력하세요:')
-        if ok and self.topic_input:
-            self.topic_label.setText(self.topic_input)
-        
-        # 주제 레이블 스타일 설정 (30포인트 크기, 볼드체)
-        topic_font = self.topic_label.font()
-        topic_font.setPointSize(30)
-        topic_font.setBold(True)
-        self.topic_label.setFont(topic_font)
-        self.layout.addWidget(self.topic_label)
+        # 주제 선택 버튼
+        self.topic_btn = QPushButton('주제 선택')
+        self.topic_btn.clicked.connect(self.select_topic)
+        self.layout.addWidget(self.topic_btn)
 
         # 선택지 추가 버튼
         self.add_choice_btn = QPushButton('선택지 추가')
@@ -44,13 +37,27 @@ class VotingApp(QWidget):
         self.start_vote_btn.clicked.connect(self.start_voting)
         self.layout.addWidget(self.start_vote_btn)
 
+        # 기록 불러오기 버튼
+        self.load_record_btn = QPushButton('기록 불러오기')
+        self.load_record_btn.clicked.connect(self.load_record)
+        self.layout.addWidget(self.load_record_btn)
+
         self.labelbox = QVBoxLayout()
         self.layout.addLayout(self.labelbox)
 
         self.choices = [] # 선택지 리스트 초기화
-        
         self.vote_counts = {} # 투표 결과 초기화
         self.stickers = {} # 스티커 초기화
+
+    def select_topic(self):
+        self.topic_input, ok = QInputDialog.getText(self, '투표 주제 입력', '주제를 입력하세요:')
+        if ok and self.topic_input:
+            self.topic_label = QLabel(self.topic_input)
+            topic_font = self.topic_label.font()
+            topic_font.setPointSize(30)
+            topic_font.setBold(True)
+            self.topic_label.setFont(topic_font)
+            self.layout.addWidget(self.topic_label)
 
     def add_choice(self):
         text, ok = QInputDialog.getText(self, '선택지 추가', '선택지 이름을 입력하세요:')
@@ -67,6 +74,26 @@ class VotingApp(QWidget):
             self.vote_screen = VotingScreen(self.choices, self.vote_counts, self.stickers, self)
             self.vote_screen.show()
 
+    def load_record(self):
+        file_name, _ = QInputDialog.getText(self, '기록 불러오기', '파일 이름을 입력하세요:')
+        if file_name:
+            try:
+                with open(file_name, 'r', encoding='utf-8') as f:
+                    reader = csv.reader(f)
+                    self.topic_input = next(reader)[0]
+                    self.choices = []
+                    self.vote_counts = {}
+                    self.stickers = {}
+                    for row in reader:
+                        choice, count, stickers = row
+                        self.choices.append(choice)
+                        self.vote_counts[choice] = int(count)
+                        self.stickers[choice] = json.loads(stickers)
+                    self.start_voting()
+                    self.vote_screen.file_name = file_name  # 파일 이름 저장
+            except FileNotFoundError:
+                print("파일을 찾을 수 없습니다.")
+
     def reset_app(self):
         # 주제와 선택지를 초기화하고 처음부터 다시 시작
         self.topic_input = '' # 주제 초기화
@@ -78,12 +105,6 @@ class VotingApp(QWidget):
         for i in reversed(range(self.labelbox.count())):
             self.labelbox.itemAt(i).widget().setParent(None) # 레이블 박스에 있는 모든 위젯 제거
 
-        # 주제 입력 다이얼로그를 다시 띄움
-        self.topic_input, ok = QInputDialog.getText(self, '투표 주제 입력', '주제를 입력하세요:')
-        if ok and self.topic_input:
-            self.topic_label.setText(self.topic_input)
-        else:
-            self.topic_label.setText("주제를 입력하세요.")
         self.show()  # 초기 화면을 다시 보여줌
 
 class VotingScreen(QWidget):
@@ -95,10 +116,10 @@ class VotingScreen(QWidget):
         self.stickers = stickers
         self.sticker_size = 20
         self.voting_app = parent
+        self.file_name = None  # 파일 이름 초기화
         self.init_ui()
 
     def init_ui(self):
-        # self.setGeometry(100, 100, 800, 400)  # 가로: 800, 세로: 400
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.showFullScreen()
         qt_material.apply_stylesheet(self, theme='dark_purple.xml')
@@ -136,7 +157,7 @@ class VotingScreen(QWidget):
             # 선택지 이름 글씨 설정: 검은색, 볼드체 해제, 크기 증가
             painter.setPen(QColor(0, 0, 0))  # 검은색
             font = painter.font()
-            font.setBold(True)  # 볼드체 해제
+            font.setBold(True)  # 볼드체
             font.setPointSize(20)  # 글씨 크기
             painter.setFont(font)
 
@@ -170,31 +191,29 @@ class VotingScreen(QWidget):
             })
             self.update()
 
-
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Escape:
             # 주제를 키로 사용하여 투표 결과 저장
-            save_data = {self.voting_app.topic_input + " "+ datetime.now().strftime("%Y-%m-%d %H:%M:%S"): self.vote_counts}
+            if self.file_name:
+                file_name = self.file_name
+            else:
+                file_name = f'vote_results_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+            
+            with open(file_name, 'w', encoding='utf-8', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow([self.voting_app.topic_input])
+                for choice in self.choices:
+                    writer.writerow([choice, self.vote_counts[choice], json.dumps(self.stickers[choice])])
 
-            existing_data = {}
-            try:
-                with open('vote_results.json', 'r', encoding='utf-8') as f:
-                    existing_data = json.load(f)
-            except (FileNotFoundError, json.JSONDecodeError):
-                existing_data = {}
-
-            existing_data.update(save_data)
-
-            with open('vote_results.json', 'w', encoding='utf-8') as f:
-                json.dump(existing_data, f, ensure_ascii=False, indent=4)
+            # 화면을 이미지로 저장
+            if not os.path.exists('./result'):
+                os.makedirs('./result')
+            pixmap = QPixmap(self.size())
+            self.render(pixmap)
+            pixmap.save(f'./result/vote_result_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png')
 
             self.close()
             self.voting_app.reset_app()  # 초기화면으로 돌아가 주제부터 다시 입력
-
-    # def resizeEvent(self, event):
-        # super().resizeEvent(event)
-        # 창 크기가 변경될 때 비율을 유지하도록 조정
-        # self.setFixedSize(self.width(), (self.width() * 8) // 16)
 
 def main():
     app = QApplication(sys.argv)
