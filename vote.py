@@ -197,7 +197,7 @@ class VotingScreen(QWidget):
             if self.file_name:
                 file_name = self.file_name
             else:
-                file_name = f'vote_results_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+                file_name = f'{self.voting_app.topic_input}_{datetime.now().strftime("%Y%m%d")}.csv'
             
             with open(file_name, 'w', encoding='utf-8', newline='') as f:
                 writer = csv.writer(f)
@@ -210,7 +210,7 @@ class VotingScreen(QWidget):
                 os.makedirs('./result')
             pixmap = QPixmap(self.size())
             self.render(pixmap)
-            pixmap.save(f'./result/vote_result_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png')
+            pixmap.save(f'./result/{self.voting_app.topic_input}_{datetime.now().strftime("%Y%m%d")}.png')
 
             self.close()
             self.voting_app.reset_app()  # 초기화면으로 돌아가 주제부터 다시 입력
